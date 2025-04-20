@@ -1,14 +1,83 @@
 #include "DisasterPlanning.h"
+#include "error.h"
 using namespace std;
 
-Optional<Set<string>> placeEmergencySupplies(const Map<string, Set<string>>& roadNetwork,
-                                             int numCities) {
-    /* TODO: Delete this comment and next few lines, then implement this function. */
-    (void) roadNetwork;
-    (void) numCities;
+bool isCovered(const string& city,
+               const Map<string, Set<string>>& roadNetwork,
+               const Set<string>& supplyLocations);
+
+Optional<Set<string>> findCoverage(const Map<string, Set<string>>& roadNetwork,
+                                   int numCities,
+                                   const Set<string>& remainingCities,
+                                   const Set<string>& chosen) {
+    // Base case: all cities are covered
+    if (remainingCities.isEmpty()) {
+        return chosen;
+    }
+
+    // Base case: no more cities to choose
+    if (numCities == 0) {
+        return Nothing;
+    }
+
+    // Select an uncovered city
+    string toCover = remainingCities.first();
+
+    // Option 1: Cover this city by selecting it
+    Set<string> newChosen = chosen + toCover;
+    Set<string> newlyCovered;
+    newlyCovered += toCover;
+    for (string neighbor : roadNetwork[toCover]) {
+        newlyCovered += neighbor;
+    }
+
+    Optional<Set<string>> solution = findCoverage(
+        roadNetwork,
+        numCities - 1,
+        remainingCities - newlyCovered,
+        newChosen
+        );
+    if (solution != Nothing) {
+        return solution;
+    }
+
+    // Option 2: Cover this city by selecting one of its neighbors
+    for (string neighbor : roadNetwork[toCover]) {
+        Set<string> neighborChosen = chosen + neighbor;
+        Set<string> neighborCovered;
+        neighborCovered += neighbor;
+        for (string n : roadNetwork[neighbor]) {
+            neighborCovered += n;
+        }
+
+        solution = findCoverage(
+            roadNetwork,
+            numCities - 1,
+            remainingCities - neighborCovered,
+            neighborChosen
+            );
+        if (solution != Nothing) {
+            return solution;
+        }
+    }
+
     return Nothing;
 }
 
+Optional<Set<string>> placeEmergencySupplies(const Map<string, Set<string>>& roadNetwork,
+                                             int numCities) {
+    if (numCities < 0) {
+        error("Negative number of cities not allowed");
+    }
+
+    // Get all cities
+    Set<string> allCities;
+    for (string city : roadNetwork) {
+        allCities += city;
+    }
+
+    return findCoverage(roadNetwork, numCities, allCities, {});
+}
 
 /* * * * * * * Test Helper Functions Below This Point * * * * * */
 #include "GUI/SimpleTest.h"

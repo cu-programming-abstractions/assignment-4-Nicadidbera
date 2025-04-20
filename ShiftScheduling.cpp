@@ -1,44 +1,128 @@
 #include "ShiftScheduling.h"
+#include "error.h"
+#include "GUI/SimpleTest.h"
 using namespace std;
 
-int numSchedulesFor(const Set<Shift>& shifts, int maxHours) {
-    /* TODO: Delete this comment and the lines below it, then implement
-     * this function.
-     */
-    (void) shifts;
-    (void) maxHours;
-    return -1;
+bool overlaps(const Shift& a, const Shift& b)
+{
+    return overlapsWith(a, b);
 }
 
-Set<Shift> maxProfitSchedule(const Set<Shift>& shifts, int maxHours) {
-    /* TODO: Delete this comment and the lines below it, then implement
-     * this function.
-     */
-    (void) shifts;
-    (void) maxHours;
-    return {};
+int totalHours(const Set<Shift>& schedule)
+{
+    int hours = 0;
+    for (const Shift& s : schedule)
+    {
+        hours += lengthOf(s);
+    }
+    return hours;
 }
 
+int totalValue(const Set<Shift>& schedule)
+{
+    int value = 0;
+    for (const Shift& s : schedule)
+    {
+        value += profitFor(s);
+    }
+    return value;
+}
 
+int numSchedulesFor(const Set<Shift>& shifts, int maxHours)
+{
+    if (maxHours < 0) error("Negative hours not allowed");
+    if (shifts.isEmpty()) return 1;
 
+    Shift first = shifts.first();
+    Set<Shift> rest = shifts - first;
 
-/* * * * * * Test Cases * * * * * */
-#include "GUI/SimpleTest.h"
+    int count = numSchedulesFor(rest, maxHours);
 
-/* TODO: Add your own tests here. You know the drill - look for edge cases, think about
- * very small and very large cases, etc.
- */
+    int shiftHours = lengthOf(first);
+    if (shiftHours <= maxHours)
+    {
+        Set<Shift> compatible;
+        for (const Shift& s : rest)
+        {
+            if (!overlaps(first, s)) compatible += s;
+        }
+        count += numSchedulesFor(compatible, maxHours - shiftHours);
+    }
+    return count;
+}
 
+void findBestSchedule(const Set<Shift>& shifts, int maxHours, Set<Shift>& current, int currentHours, int currentValue, Set<Shift>& best, int& bestValue)
+{
+    if (shifts.isEmpty())
+    {
+        if (currentValue > bestValue || (currentValue == bestValue && current.size() < best.size()))
+        {
+            best = current;
+            bestValue = currentValue;
+        }
+        return;
+    }
 
+    Shift first = shifts.first();
+    Set<Shift> rest = shifts - first;
 
+    findBestSchedule(rest, maxHours, current, currentHours, currentValue, best, bestValue);
 
+    int shiftHours = lengthOf(first);
+    if (shiftHours <= maxHours)
+    {
+        bool compatible = true;
+        for (const Shift& s : current)
+        {
+            if (overlaps(s, first))
+            {
+                compatible = false;
+                break;
+            }
+        }
+        if (compatible)
+        {
+            current += first;
+            findBestSchedule(rest, maxHours - shiftHours, current, currentHours + shiftHours, currentValue + profitFor(first), best, bestValue);
+            current -= first; // Backtrack
+        }
+    }
+}
 
+Set<Shift> maxProfitSchedule(const Set<Shift>& shifts, int maxHours)
+{
+    if (maxHours < 0) error("Negative hours not allowed");
 
+    Set<Shift> best;
+    int bestValue = 0;
+    Set<Shift> current;
 
+    findBestSchedule(shifts, maxHours, current, 0, 0, best, bestValue);
+    return best;
+}
 
+// Test cases
+PROVIDED_TEST("numSchedulesFor reports errors with illegal numbers of hours.") {
+    EXPECT_ERROR(numSchedulesFor({}, -137));
+    EXPECT_ERROR(numSchedulesFor({}, -1));
+    EXPECT_NO_ERROR(numSchedulesFor({}, 0));
+}
 
+PROVIDED_TEST("numSchedulesFor works with just one shift.") {
+    Shift mondayShift(Day::MONDAY, 9, 17);
+    Set<Shift> shifts = { mondayShift };
+    EXPECT_EQUAL(numSchedulesFor(shifts, 24), 2);
+    EXPECT_EQUAL(numSchedulesFor(shifts, 8), 2);
+    EXPECT_EQUAL(numSchedulesFor(shifts, 7), 1);
+}
 
-
+PROVIDED_TEST("maxProfitSchedule works on one shift.") {
+    Shift mondayShift(Day::MONDAY, 9, 17, 1000);
+    Set<Shift> shifts = { mondayShift };
+    EXPECT_EQUAL(maxProfitSchedule(shifts, 24), shifts);
+    EXPECT_EQUAL(maxProfitSchedule(shifts, 8), shifts);
+    EXPECT_EQUAL(maxProfitSchedule(shifts, 1), {});
+}
 
 
 
